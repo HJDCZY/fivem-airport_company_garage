@@ -1,36 +1,8 @@
 ## FIVEM aircraft_company_garage
 
-由HJDCZY编写，目前在洛城飞行大队的模拟飞行服务器使用，代码在github开源。
-
-本插件需要一些前置插件，有：
-
-1. es_extended
-2. mysql-async
-3. menuv
-4. polyzone
-
-这个插件根据玩家所在的公司分配公司的机库，公司的载具是有限制的，不是无限刷的。跟市面上的很多玩家车库差不多。
-
-目前的话加载具需要手动去数据库加，在“aircraft_company_garage”这个表里面。
-
-另外一个表“aircraft_company"是储存机库信息，4个坐标是机库的四个角，机库是一个四边形区域。
-
-后面如果更新的话大概就是更新：
-* 目前不能储存载具的损坏值，数据库有这一列，但是没写相应代码
-* 改用omxysql而不是mysql-async
-
-
-这是我写的第一个插件，我也是小白，调试了很久。我在代码中写了很详细的注释，我觉得我写的这个插件非常适合作为新手学习的插件。
-
-默认按F6打开菜单，F7/F3储存载具，一般进机库区域会有提示。
-
-大家有什么更新想法可以提出来，我去做。
-
--------
-
-## FIVEM aircraft_ company_ garage
-
-
+<!-- 通过链接切换中英文 -->
+[English](README.md) | [中文](README_CN.md)
+# FIVEM aircraft_ company_ garage
 
 Written by HJDCZY and currently used in the simulation flight server of the CNAT , the code is open source on Github.
 
