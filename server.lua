@@ -46,22 +46,34 @@ AddEventHandler('aircraft_company_garage:queryzone', function (job, serverid)
     end)
 end)
 
+local menuinuse = false
 --接受客户端的载具仓库菜单请求，查询数据库中的载具信息
 RegisterNetEvent("aircraft_company_garage:queryvehicle")
 AddEventHandler("aircraft_company_garage:queryvehicle", function(job,serverid)
     local job = job
     --查询数据库中的载具信息
     -- print("before query")
-    MySQL.Async.fetchAll("SELECT * FROM `aircraft_company_garage` WHERE `company` = @company", {--注意数据库表名
-        ['@company'] = job
-    },function(rest)
-        -- print(json.encode(rest))
-        -- print("queryvehicle")
-        TriggerClientEvent("aircraft_company_garage:receivevehicle",serverid,rest)
+    --如果有其他玩家在使用菜单，那么不予查询
+    if menuinuse then
+        TriggerClientEvent("aircraft_company_garage:receivevehicle",serverid,false)
+    else
+            MySQL.Async.fetchAll("SELECT * FROM `aircraft_company_garage` WHERE `company` = @company", {--注意数据库表名
+            ['@company'] = job
+                },function(rest)
+            -- print(json.encode(rest))
+            -- print("queryvehicle")
+            menuinuse = true
+            TriggerClientEvent("aircraft_company_garage:receivevehicle",serverid,rest)
+        end)   
     end
-    )
-    --返回给客户端
-    
+       
+    --只能有一位玩家使用菜单，所以在打开菜单时，变量为0，不允许其他玩家使用菜单    
+end)
+
+--客户端玩家非正常关闭菜单时，释放其他玩家的使用权
+RegisterNetEvent("aircraft_company_garage:closemenu")
+AddEventHandler("aircraft_company_garage:closemenu", function(serverid)
+    menuinuse = false
 end)
 
 --客户端生成载具后，服务端在数据库中更改载具状态
@@ -75,6 +87,7 @@ AddEventHandler("aircraft_company_garage:changestatus", function(plate,serverid,
         ['@plate'] = plate
     },function()
         TriggerClientEvent("aircraft_company_garage:changestatus",serverid,true,model,plate)
+        
         -- print("changestatus")
     end
     )
@@ -93,6 +106,7 @@ AddEventHandler("aircraft_company_garage:writeplate", function(plate,gameplate)
         ['@gameplate'] = gameplate
     },function()
         -- print("writeplate")
+        menuinuse = false
     end
     )
     
@@ -100,19 +114,19 @@ end)
 
 --客户端要求储存载具，服务端检查载具是否是公司的
 RegisterNetEvent("aircraft_company_garage:checkplate")
-AddEventHandler("aircraft_company_garage:checkplate", function(plate,serverid,vehicle)
+AddEventHandler("aircraft_company_garage:checkplate", function(gameplate,serverid,vehicle)
     -- print(plate)
     --在数据库中获取所有载具信息
-    MySQL.Async.fetchAll("SELECT * FROM `aircraft_company_garage` WHERE `plate` = @plate", {
-        ['@plate'] = plate
+    MySQL.Async.fetchAll("SELECT * FROM `aircraft_company_garage` WHERE `gameplate` = @gameplate", {
+        ['@gameplate'] = gameplate
     },function(rest)
         --判断有没有取出数据,如果没有取出数据，说明载具不是公司的
         -- print(json.encode(rest))
         -- print(rest[1])
         if rest[1] == nil then
-            TriggerClientEvent("aircraft_company_garage:checkplate",serverid,false,plate,vehicle)
+            TriggerClientEvent("aircraft_company_garage:checkplate",serverid,false,gameplate,vehicle)
         else
-            TriggerClientEvent("aircraft_company_garage:checkplate",serverid,true,plate,vehicle)
+            TriggerClientEvent("aircraft_company_garage:checkplate",serverid,true,gameplate,vehicle)
         end
     end
     )
@@ -124,12 +138,28 @@ RegisterNetEvent("aircraft_company_garage:storevehicle")
 AddEventHandler("aircraft_company_garage:storevehicle", function(gameplate,serverid,vehicle)
     -- print(plate)
     --在数据库中更改载具状态
-    MySQL.Async.execute("UPDATE `aircraft_company_garage` SET `state` = @state WHERE `gameplate` = @plate", {
+    MySQL.Async.execute("UPDATE `aircraft_company_garage` SET `state` = @state WHERE `gameplate` = @gameplate", {
         ['@state'] = 1,
-        ['@plate'] = gameplate
+        ['@gameplate'] = gameplate
     },function()
         TriggerClientEvent("aircraft_company_garage:storevehicle",serverid,true,vehicle)
     end
     )
     
 end)
+
+--在服务端设置玩家职业为飞行学院学生
+RegisterNetEvent("aircraft_company_garage:setjob")
+AddEventHandler("aircraft_company_garage:setjob", function(serverid)
+    local xPlayer = ESX.GetPlayerFromId(source)
+    --检查玩家是否为无业，如果是无业，设置玩家职业为飞行学院学生
+    if xPlayer.getJob().name == "unemployed" then
+        xPlayer.setJob("flightschool", 0)
+        TriggerClientEvent("aircraft_company_garage:setjob",serverid,true)
+    else
+        TriggerClientEvent("aircraft_company_garage:setjob",serverid,false)
+    end
+    
+    -- xPlayer.setJob("flightschool", 0)
+end)
+

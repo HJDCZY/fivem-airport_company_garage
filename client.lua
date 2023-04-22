@@ -12,7 +12,7 @@ local job = nil
 local ped = GetPlayerPed(-1);
 local playerindex = NetworkGetPlayerIndexFromPed(ped)
 local serverid = GetPlayerServerId(playerindex)
-local menu = nil
+local menu = MenuV:CreateMenu("公司载具仓库", "按退格键关闭", 'bottomright',255,0,0,'size-100','default', 'menuv', 'aircraft_company_garage')
 local crood = nil
 
 --呼叫载具部分
@@ -77,10 +77,20 @@ local function createzone()
             debugGrid=false,
             gridDivisions=25
         })
+        -- 在四个点的中心画blip
+        local blip = AddBlipForCoord((zone.x1+zone.x2+zone.x3+zone.x4)/4,(zone.y1+zone.y2+zone.y3+zone.y4)/4,10)
+        SetBlipSprite(blip, 359)
+        SetBlipDisplay(blip, 4)
+        SetBlipScale(blip, 1.0)
+        SetBlipColour(blip, 0)
+        SetBlipAsShortRange(blip, true)
+        BeginTextCommandSetBlipName("STRING")
+        AddTextComponentString(zone.label)
+        EndTextCommandSetBlipName(blip)
         -- print("zone created")
         -- print(json.encode(garagezone))
         isingarage(garagezone)
-        menu = MenuV:CreateMenu("公司载具仓库", "按退格键关闭", 'bottomright',255,0,0,'size-125','default', 'menuv', 'aircraft_company_garage')
+        
     end)
    
 end
@@ -90,18 +100,18 @@ Citizen.CreateThread(function()
     while true do
         if ESX.IsPlayerLoaded() then
                 -- print("checkjob15")
-            Citizen.Wait(5000)
-            -- print("checkjob18")
-            RegisterNetEvent('aircraft_company_garage:checkjob')
-            -- print("checkjob20")
-            TriggerServerEvent('aircraft_company_garage:checkjob',serverid)
-            -- print("checkjob22")
-            --接受服务端返回的职业信息并保存
-            AddEventHandler('aircraft_company_garage:checkjob', function (job1)
-                job = job1--此处job代表航空公司名称
-                -- print("job" .. job)
-                -- print("checkjob")
-                createzone()
+                Citizen.Wait(5000)
+                -- print("checkjob18")
+                RegisterNetEvent('aircraft_company_garage:checkjob')
+                -- print("checkjob20")
+                TriggerServerEvent('aircraft_company_garage:checkjob',serverid)
+                -- print("checkjob22")
+                --接受服务端返回的职业信息并保存
+                AddEventHandler('aircraft_company_garage:checkjob', function (job1)
+                    job = job1--此处job代表航空公司名称
+                    -- print("job" .. job)
+                    -- print("checkjob")
+                    createzone()
             end)
             -- print("checkjob29")
             break
@@ -110,7 +120,6 @@ Citizen.CreateThread(function()
     end
 
 end)
-
 
 
 local open = false
@@ -150,8 +159,12 @@ AddEventHandler("aircraft_company_garage:changestatus", function(result,model,pl
         spawnvehicle(model,plate)
         --客户端生成载具后，删除菜单，下次打开时重新生成
         open = false
-        menu:Close()
-        MenuV:CloseMenu(menu)
+        local i =1
+        while i<=50 do
+            menu:Close()
+            MenuV:CloseMenu(menu)
+            i = i+1
+        end
         --重置菜单
         menu:ClearItems(true)
         haveloadedmenu = false
@@ -179,6 +192,10 @@ end
 RegisterNetEvent("aircraft_company_garage:receivevehicle")
 local vehicles = nil
 AddEventHandler("aircraft_company_garage:receivevehicle", function(result)
+    if result == false then
+        ESX.ShowHelpNotification("有其他玩家正在操作机库，请稍后再试")
+        return
+    end
     --将载具信息写入菜单
     vehicles = result
     -- print(json.encode(vehicles))
@@ -191,7 +208,7 @@ AddEventHandler("aircraft_company_garage:receivevehicle", function(result)
         -- print(v.model)
         -- print("------------------")
         if v.state == true then
-            buttons[i]=menu:AddButton({icon ='✈️',label = v.plate .. v.model, })
+            buttons[i]=menu:AddButton({icon ='✈️',label = v.plate .. v.label, })
             --选择时触发事件，生成载具
             -- print(i)
             -- print(buttons[i])
@@ -202,7 +219,7 @@ AddEventHandler("aircraft_company_garage:receivevehicle", function(result)
             end)                
         else
             --添加载具信息,如果被取出，则显示为灰色
-            buttons[i]=menu:AddButton({icon ='🚫',label = v.plate .. v.model,disabled = true })
+            buttons[i]=menu:AddButton({icon ='🚫',label = v.plate .. v.label,disabled = true })
         end
         haveloadedmenu = true
         menu:Open()
@@ -211,8 +228,11 @@ AddEventHandler("aircraft_company_garage:receivevehicle", function(result)
     end
     --提示玩家按退格键关闭菜单
     ESX.ShowHelpNotification("您可以按~INPUT_FRONTEND_RRIGHT~关闭菜单,按一次关不上就多按几次")
-    
+end)
 
+menu:On("close", function()
+    --提示服务器玩家已经关闭菜单
+    TriggerServerEvent("aircraft_company_garage:closemenu",serverid)
 end)
 
 --使用命令调出载具仓库菜单,检查条件
@@ -283,3 +303,46 @@ end, false)
 --为命令添加按键
 RegisterKeyMapping("cs", "储存载具", "keyboard", "F3")
 
+--添加一个marker，玩家进入的时候可以加入飞行学院
+local marker = {
+    x = -1059.0,
+    y = -3441.0,
+    z = 13.0,
+    radius = 2.0,
+}
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(0)
+        --画出marker
+        DrawMarker(1,marker.x,marker.y,marker.z,0,0,0,0,0,0,marker.radius,marker.radius,marker.radius,255,200,200,200,0,0,0,0)
+        local ped = PlayerPedId()
+        local crood = GetEntityCoords(ped)
+        local distance = GetDistanceBetweenCoords(crood.x,crood.y,crood.z,marker.x,marker.y,marker.z,true)
+        if distance < marker.radius+1 then
+            ESX.ShowHelpNotification("按~INPUT_CONTEXT~加入飞行学院")
+            if IsControlJustReleased(0, 38) then
+                --在服务端设置玩家职业为飞行学院学生
+                TriggerServerEvent("aircraft_company_garage:setjob",serverid)
+            end
+        end
+    end
+end)
+
+--接收服务端返回的结果，如果玩家已经有职业，则提示玩家
+RegisterNetEvent("aircraft_company_garage:setjob")
+AddEventHandler("aircraft_company_garage:setjob", function(result)
+    print(result)   
+    if not result then
+        TriggerEvent("chat:addMessage", {
+            color = {255,255,255},
+            multiline = true,
+            args = {"你已经有职业了"}
+        })
+    else
+        TriggerEvent("chat:addMessage", {
+            color = {255,255,255},
+            multiline = true,
+            args = {"你已经加入飞行学院"}
+        })
+    end
+end)

@@ -14,6 +14,9 @@ create table aircraft_company_garage(
     plate char(50) not null,
     -- 创建一列名为gameplate,text,默认为NULL
     gameplate text default NULL,
+    -- 创建一列名为label,char
+    label char(50) not null,
+
     -- 结束
     primary key(id)
 )engine=innodb default charset=utf8;

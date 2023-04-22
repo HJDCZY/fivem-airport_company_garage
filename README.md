@@ -10,8 +10,6 @@ Written by HJDCZY and currently used in the simulation flight server of the CNAT
 
 This plugin requires some front-end plugins, including:
 
-
-
 1. es_ extended
 
 2. mysql-async

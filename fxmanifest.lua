@@ -10,13 +10,13 @@ version'1.0.0'
 --所以如果更改fxmanifest.lua，需要重启服务器,而不是仅仅重启插件
 
 client_scripts{
+	'@menuv/menuv.lua',
     '@es_extended/locale.lua',
 	'@PolyZone/client.lua',
 	'@PolyZone/BoxZone.lua',
 	'@PolyZone/EntityZone.lua',
 	'@PolyZone/CircleZone.lua',
 	'@PolyZone/ComboZone.lua',
-    '@menuv/menuv.lua',
     'client.lua',
     -- 'example.lua',
 }
