@@ -19,7 +19,18 @@ local crood = nil
 local show = true
 local garagezone = nil
 local isinzone = false
+local hasqueryaplane = false
 
+Citizen.CreateThread(function ()
+    while true do
+        Citizen.Wait(100);
+        if ESX.IsPlayerLoaded() then
+            --触发命令，加载机库
+            ExecuteCommand("loadgarage")
+            return;
+        end 
+    end
+end)
 
 local function isingarage(garagezone)
     Citizen.CreateThread(function ()
@@ -61,6 +72,10 @@ local function createzone()
     local zone = nil
     AddEventHandler('aircraft_company_garage:queryzone', function (zone)
         zone = zone
+        if zone == nil then
+            ESX.ShowNotification("您所在的公司没有机库")
+            return;
+        end
         -- print(json.encode(zone))
         --使用polyzone插件创建区域,数据库取数据需要时间，所以在此处创建
         --如果在外面创建，数据库的数据还没传回来，zone就是nil，会报错
@@ -92,39 +107,67 @@ local function createzone()
         isingarage(garagezone)
         
     end)
-   
 end
 
-
-Citizen.CreateThread(function()
-    while true do
-        if ESX.IsPlayerLoaded() then
-                -- print("checkjob15")
-                Citizen.Wait(5000)
-                -- print("checkjob18")
-                RegisterNetEvent('aircraft_company_garage:checkjob')
-                -- print("checkjob20")
-                TriggerServerEvent('aircraft_company_garage:checkjob',serverid)
-                -- print("checkjob22")
-                --接受服务端返回的职业信息并保存
-                AddEventHandler('aircraft_company_garage:checkjob', function (job1)
-                    job = job1--此处job代表航空公司名称
-                    -- print("job" .. job)
-                    -- print("checkjob")
-                    createzone()
-            end)
-            -- print("checkjob29")
-            break
+RegisterCommand("loadgarage",function ()
+    Citizen.CreateThread(function()
+        while true do
+            if ESX.IsPlayerLoaded() then
+                    -- print("checkjob15")
+                    Citizen.Wait(5000)
+                    -- print("checkjob18")
+                    RegisterNetEvent('aircraft_company_garage:checkjob')
+                    -- print("checkjob20")
+                    TriggerServerEvent('aircraft_company_garage:checkjob',serverid)
+                    -- print("checkjob22")
+                    --接受服务端返回的职业信息并保存
+                    AddEventHandler('aircraft_company_garage:checkjob', function (job1)
+                        job = job1--此处job代表航空公司名称
+                        -- print("job" .. job)
+                        -- print("checkjob")
+                        createzone()
+                end)
+                -- print("checkjob29")
+                break
+            end
+            Citizen.Wait(1000)
         end
-        Citizen.Wait(1000)
-    end
+    
+    end)
+end,false)
 
-end)
 
 
 local open = false
-
+local vehicleout = nil
 --一个函数用于生成载具
+
+local function monitorvehiclehealth(plate)
+    --监测被取出载具的健康状态，如果低于一半，就提示玩家并且写入log
+    Citizen.CreateThread(function()
+        print("monitorvehiclehealth")
+        while true do
+            Citizen.Wait(100)
+            if vehicleout ~= nil then
+                local enginehealth = GetVehicleEngineHealth(vehicleout)
+                local bodyhealth = GetVehicleBodyHealth(vehicleout)
+                if enginehealth < 500 then
+                    ESX.ShowNotification("您取出的载具引擎健康状态不佳，请及时修理")
+                    --发送给服务端，写入log
+                    TriggerServerEvent("aircraft_company_garage:damagelog",serverid,plate,"engine")                   
+                    break
+                end
+                if bodyhealth < 500 then
+                    ESX.ShowNotification("您取出的载具车身健康状态不佳，请及时修理")
+                    --发送给服务端，写入log
+                    TriggerServerEvent("aircraft_company_garage:damagelog",serverid,plate,"body")
+                    break
+                end
+            end
+        end
+    end)
+end
+
 
 local function spawnvehicle(model,plate)
     -- print(model)
@@ -138,9 +181,14 @@ local function spawnvehicle(model,plate)
         gameplate = GetVehicleNumberPlateText(vehicle)
         --将这辆载具的游戏内车牌号写入数据库，以便载具准备入库时，能够找到这辆载具
         TriggerServerEvent("aircraft_company_garage:writeplate",plate,gameplate)
+        vehicleout = vehicle;
+        monitorvehiclehealth(plate)
+        return true
     end)
     
 end
+
+
 
 local haveloadedmenu = false
 local function spawnvehicle1(model,plate)
@@ -170,6 +218,9 @@ AddEventHandler("aircraft_company_garage:changestatus", function(result,model,pl
         haveloadedmenu = false
         --提示玩家按退格键关闭菜单
         ESX.ShowHelpNotification("您可以按~INPUT_FRONTEND_RRIGHT~关闭菜单")
+        
+        --让玩家无法再次打开菜单
+        hasqueryaplane = true
     else
         ESX.ShowHelpNotification("数据库载具状态更改失败，请联系滑稽")
     end
@@ -194,6 +245,10 @@ local vehicles = nil
 AddEventHandler("aircraft_company_garage:receivevehicle", function(result)
     if result == false then
         ESX.ShowHelpNotification("有其他玩家正在操作机库，请稍后再试")
+        return
+    end
+    if hasqueryaplane == true then
+        ESX.ShowHelpNotification("您已经取出了一架飞机，无法再次取出")
         return
     end
     --将载具信息写入菜单
@@ -224,16 +279,57 @@ AddEventHandler("aircraft_company_garage:receivevehicle", function(result)
         haveloadedmenu = true
         menu:Open()
         buttons = {}
+        --为了防止玩家打开菜单之后退出游戏，导致其他玩家无法使用机库
+        --打开菜单后，服务端计时30秒，30秒后，如果玩家没有关闭菜单，则自动关闭
+        TriggerServerEvent("aircraft_company_garage:opentime",serverid)
 
     end
     --提示玩家按退格键关闭菜单
     ESX.ShowHelpNotification("您可以按~INPUT_FRONTEND_RRIGHT~关闭菜单,按一次关不上就多按几次")
+    Citizen.CreateThread(function ()
+        while true do
+            Citizen.Wait(0)
+            if IsControlJustPressed(0,  202) then
+                local u =1
+                while u<=50 do
+                    menu:Close()
+                    MenuV:CloseMenu(menu)
+                    u = u+1
+                end
+                open = false
+                haveloadedmenu = false
+                menu:ClearItems(true)
+                break
+            end
+        end
+        print("closemenu")
+        TriggerServerEvent("aircraft_company_garage:closemenu",serverid)
+        return
+    end)
 end)
 
-menu:On("close", function()
-    --提示服务器玩家已经关闭菜单
-    TriggerServerEvent("aircraft_company_garage:closemenu",serverid)
+--接受服务端发送的计时结果，如果玩家没有关闭菜单，则自动关闭
+RegisterNetEvent("aircraft_company_garage:forceclosemenu")
+AddEventHandler("aircraft_company_garage:forceclosemenu", function()
+    if haveloadedmenu then
+        local u =1
+        while u<=50 do
+            menu:Close()
+            MenuV:CloseMenu(menu)
+            u = u+1
+        end
+        open = false
+        haveloadedmenu = false
+        menu:ClearItems(true)
+        ESX.ShowHelpNotification("您打开了菜单但是30秒内没有关闭，已经为您关闭")
+        TriggerServerEvent("aircraft_company_garage:closemenu",serverid)
+    end
 end)
+
+-- menu:On("close", function()
+--     --提示服务器玩家已经关闭菜单
+--     TriggerServerEvent("aircraft_company_garage:closemenu",serverid)
+-- end)
 
 --使用命令调出载具仓库菜单,检查条件
 RegisterCommand("open_aircraft_company_garage_menu", function()
@@ -283,6 +379,8 @@ AddEventHandler("aircraft_company_garage:storevehicle", function(result1,vehicle
         ESX.Game.DeleteVehicle(vehicle)
         --提示玩家储存成功
         ESX.ShowHelpNotification("载具入库成功")
+        hasqueryaplane = false
+        vehicleout = nil
     else
         ESX.ShowHelpNotification("载具入库失败，请联系滑稽")
     end

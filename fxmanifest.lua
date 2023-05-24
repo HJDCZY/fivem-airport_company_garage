@@ -32,8 +32,9 @@ server_scripts {
 	
 }
 
--- files{
---    'script.js',
---    'style.css'
--- }
---依赖于es_extended和mysql-async
+files{
+   'script.js',
+   'style.css',
+   'log.txt',
+}
+-- 依赖于es_extended和mysql-async
