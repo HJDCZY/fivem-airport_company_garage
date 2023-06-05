@@ -62,6 +62,34 @@ AddEventHandler('aircraft_company_garage:queryzone', function (job, serverid)
     end)
 end)
 
+--玩家打开菜单后，服务端计时，如果玩家长时间不关闭菜单，服务端自动关闭菜单
+RegisterNetEvent("aircraft_company_garage:opentime")
+AddEventHandler("aircraft_company_garage:opentime", function (serverid)
+    local xPlayer = ESX.GetPlayerFromId(source)
+    local name = xPlayer.getName()
+    Citizen.CreateThread(function ()
+        Citizen.Wait(10000);
+        if menuinuse then
+            TriggerClientEvent("aircraft_company_garage:forceclosemenu",serverid)
+            log(name.. " 长时间未关闭菜单，自动关闭")
+            menuinuse = false
+        end
+    end)
+end)
+
+function opentime (serverid)
+    local xPlayer = ESX.GetPlayerFromId(source)
+    local name = xPlayer.getName()
+    Citizen.CreateThread(function ()
+        Citizen.Wait(10000);
+        if menuinuse then
+            TriggerClientEvent("aircraft_company_garage:forceclosemenu",serverid)
+            log(name.. " 长时间未关闭菜单，自动关闭")
+            menuinuse = false
+        end
+    end)
+end
+
 local menuinuse = false
 --接受客户端的载具仓库菜单请求，查询数据库中的载具信息
 RegisterNetEvent("aircraft_company_garage:queryvehicle")
@@ -83,6 +111,7 @@ AddEventHandler("aircraft_company_garage:queryvehicle", function(job,serverid)
             menuinuse = true
             TriggerClientEvent("aircraft_company_garage:receivevehicle",serverid,rest)
             log(name.. " 打开菜单");
+            opentime(serverid)
         end)   
     end
        
@@ -205,19 +234,4 @@ AddEventHandler("aircraft_company_garage:damagelog", function(serverid,plate,whe
     local xPlayer = ESX.GetPlayerFromId(source)
     local name = xPlayer.getName()
     log(name.. " 将注册号为".. plate .."的载具的".. where .."损坏一半")
-end)
-
---玩家打开菜单后，服务端计时，如果玩家长时间不关闭菜单，服务端自动关闭菜单
-RegisterNetEvent("aircraft_company_garage:opentime")
-AddEventHandler("aircraft_company_garage:opentime", function(serverid)
-    local xPlayer = ESX.GetPlayerFromId(source)
-    local name = xPlayer.getName()
-    Citizen.CreateThread(function ()
-        Citizen.Wait(30000);
-        if menuinuse then
-            TriggerClientEvent("aircraft_company_garage:forceclosemenu",serverid)
-            log(name.. " 长时间未关闭菜单，自动关闭")
-            menuinuse = false
-        end
-    end)
 end)
